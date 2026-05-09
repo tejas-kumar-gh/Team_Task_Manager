@@ -16,6 +16,9 @@ connectDB();
 
 const app = express();
 
+// Trust proxy for secure cookies on Railway
+app.set('trust proxy', 1);
+
 // CORS Configuration
 const allowedOrigins = [
   process.env.FRONTEND_URL?.replace(/\/$/, ""), // Remove trailing slash if present
