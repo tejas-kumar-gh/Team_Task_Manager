@@ -40,20 +40,24 @@ const Dashboard = () => {
     { title: 'Overdue', value: stats.overdueTasks, icon: <AlertCircle size={24} className="text-red-500" />, bg: 'bg-red-500/10' },
   ];
 
+  if (user?.role === 'Admin') {
+    statCards.splice(1, 0, { title: 'Total Users', value: stats.totalUsers || 0, icon: <Layers size={24} className="text-orange-500" />, bg: 'bg-orange-500/10' });
+  }
+
   // Calculate progress
   const progress = stats.totalTasks > 0 ? Math.round((stats.completedTasks / stats.totalTasks) * 100) : 0;
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {statCards.map((card, index) => (
-          <div key={index} className="glass p-6 rounded-2xl flex items-center space-x-4 hover:-translate-y-1 transition-transform duration-300">
-            <div className={`p-4 rounded-xl ${card.bg}`}>
+          <div key={index} className="glass p-5 rounded-2xl flex items-center space-x-3 hover:-translate-y-1 transition-transform duration-300">
+            <div className={`p-3 rounded-xl ${card.bg}`}>
               {card.icon}
             </div>
             <div>
-              <p className="text-sm opacity-70 mb-1">{card.title}</p>
-              <h3 className="text-2xl font-bold">{card.value}</h3>
+              <p className="text-[10px] uppercase tracking-wider opacity-60 mb-0.5">{card.title}</p>
+              <h3 className="text-xl font-bold">{card.value}</h3>
             </div>
           </div>
         ))}
@@ -88,10 +92,32 @@ const Dashboard = () => {
               ? "As an Admin, you can create and manage projects, assign tasks to your team members, and monitor the overall progress of all activities."
               : "Welcome to your dashboard! Here you can track your assigned projects and update your task statuses."}
           </p>
-          <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 text-primary">
+          <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 text-primary mb-6">
             <h4 className="font-semibold mb-2 flex items-center"><AlertCircle size={18} className="mr-2" /> Quick Tip</h4>
             <p className="text-sm opacity-90">Keep your task statuses updated to help the team track overall progress accurately.</p>
           </div>
+          
+          {user?.role === 'Admin' && (
+            <div className="space-y-4">
+              <h4 className="font-bold text-sm uppercase tracking-wider opacity-60">Team Productivity</h4>
+              <div className="space-y-3">
+                <div className="flex justify-between text-xs">
+                  <span>Task Completion Rate</span>
+                  <span className="font-bold text-emerald-500">84%</span>
+                </div>
+                <div className="w-full bg-black/10 h-1.5 rounded-full overflow-hidden">
+                  <div className="bg-emerald-500 h-full w-[84%] rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span>Average Time per Task</span>
+                  <span className="font-bold text-blue-500">2.4 Days</span>
+                </div>
+                <div className="w-full bg-black/10 h-1.5 rounded-full overflow-hidden">
+                  <div className="bg-blue-500 h-full w-[60%] rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

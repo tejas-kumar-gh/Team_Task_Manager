@@ -126,13 +126,41 @@ const getDashboardStats = asyncHandler(async (req, res) => {
     totalProjects = await import('../models/Project.js').then(m => m.default.countDocuments({ members: req.user._id }));
   }
 
-  res.json({
+  let stats = {
     totalProjects,
     totalTasks,
     completedTasks,
     pendingTasks,
     overdueTasks
-  });
+  };
+
+  if (req.user.role === 'Admin') {
+    stats.totalUsers = await User.countDocuments({});
+  }
+
+  res.json(stats);
 });
 
-export { getTasks, createTask, getTaskById, updateTask, deleteTask, getDashboardStats };
+// @desc    Add comment to task
+// @route   POST /api/tasks/:id/comments
+// @access  Private
+const addComment = asyncHandler(async (req, res) => {
+  const { text } = req.body;
+  const task = await Task.findById(req.params.id);
+
+  if (task) {
+    const comment = {
+      text,
+      user: req.user._id
+    };
+
+    task.comments.push(comment);
+    await task.save();
+    res.status(201).json(task.comments[task.comments.length - 1]);
+  } else {
+    res.status(404);
+    throw new Error('Task not found');
+  }
+});
+
+export { getTasks, createTask, getTaskById, updateTask, deleteTask, getDashboardStats, addComment };

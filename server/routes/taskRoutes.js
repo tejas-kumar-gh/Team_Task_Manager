@@ -1,5 +1,5 @@
 import express from 'express';
-import { getTasks, createTask, getTaskById, updateTask, deleteTask, getDashboardStats } from '../controllers/taskController.js';
+import { getTasks, createTask, getTaskById, updateTask, deleteTask, getDashboardStats, addComment } from '../controllers/taskController.js';
 import { protect, admin } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -14,5 +14,7 @@ router.route('/:id')
   .get(protect, getTaskById)
   .put(protect, updateTask)
   .delete(protect, admin, deleteTask);
+
+router.post('/:id/comments', protect, addComment);
 
 export default router;
