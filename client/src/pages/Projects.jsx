@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
-import { Plus, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Layers, Search, X } from 'lucide-react';
 import { format } from 'date-fns';
+import ConfirmModal from '../components/ConfirmModal';
 
 const Projects = () => {
   const [projects, setProjects] = useState([]);
@@ -12,7 +13,14 @@ const Projects = () => {
   const [users, setUsers] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
-  const [formData, setFormData] = useState({ title: '', description: '', members: [] });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [memberSearchTerm, setMemberSearchTerm] = useState('');
+  
+  // Confirm Modal State
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState(null);
+
+  const [formData, setFormData] = useState({ title: '', description: '', members: [], dueDate: '' });
 
   const fetchData = async () => {
     try {
@@ -39,11 +47,12 @@ const Projects = () => {
       setFormData({
         title: project.title,
         description: project.description || '',
+        dueDate: project.dueDate ? format(new Date(project.dueDate), 'yyyy-MM-dd') : '',
         members: project.members.map(m => typeof m === 'object' ? m._id : m)
       });
     } else {
       setEditingProject(null);
-      setFormData({ title: '', description: '', members: [] });
+      setFormData({ title: '', description: '', members: [], dueDate: '' });
     }
     setIsModalOpen(true);
   };
@@ -63,14 +72,17 @@ const Projects = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if(window.confirm('Are you sure you want to delete this project? All related tasks will also be removed.')) {
-      try {
-        await api.delete(`/projects/${id}`);
-        fetchData();
-      } catch (error) {
-        console.error('Failed to delete project', error);
-      }
+  const handleDelete = (id) => {
+    setProjectToDelete(id);
+    setIsConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await api.delete(`/projects/${projectToDelete}`);
+      fetchData();
+    } catch (error) {
+      console.error('Failed to delete project', error);
     }
   };
 
@@ -87,24 +99,35 @@ const Projects = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold">Projects</h2>
           <p className="text-sm opacity-60">Manage your team's workspace and projects.</p>
         </div>
-        {user?.role === 'Admin' && (
-          <button
-            onClick={() => handleOpenModal()}
-            className="flex items-center space-x-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-xl transition-colors shadow-lg shadow-primary/30"
-          >
-            <Plus size={20} />
-            <span>New Project</span>
-          </button>
-        )}
+        <div className="flex w-full md:w-auto space-x-3">
+          <div className="relative flex-1 md:w-64">
+            <input 
+              type="text" 
+              placeholder="Search projects..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-4 pr-10 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+            />
+          </div>
+          {user?.role === 'Admin' && (
+            <button
+              onClick={() => handleOpenModal()}
+              className="flex items-center space-x-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-xl transition-colors shadow-lg shadow-primary/30"
+            >
+              <Plus size={20} />
+              <span>New Project</span>
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {projects.map((project) => (
+        {projects.filter(p => p.title.toLowerCase().includes(searchTerm.toLowerCase())).map((project) => (
           <div key={project._id} className="glass p-6 rounded-2xl group hover:-translate-y-1 transition-all duration-300 relative border border-white/5 hover:border-primary/30">
             {user?.role === 'Admin' && (
               <div className="absolute top-4 right-4 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -139,8 +162,10 @@ const Projects = () => {
                 )}
               </div>
               <div className="text-right">
-                <p className="text-[10px] uppercase tracking-wider opacity-50">Created At</p>
-                <p className="text-xs font-medium">{format(new Date(project.createdAt), 'MMM dd, yyyy')}</p>
+                <p className="text-[10px] uppercase tracking-wider opacity-50">Deadline</p>
+                <p className={`text-xs font-medium ${project.dueDate && new Date(project.dueDate) < new Date() ? 'text-red-500' : ''}`}>
+                  {project.dueDate ? format(new Date(project.dueDate), 'MMM dd, yyyy') : 'No deadline'}
+                </p>
               </div>
             </div>
           </div>
@@ -178,11 +203,32 @@ const Projects = () => {
                   placeholder="Describe the project goals and scope..."
                 />
               </div>
+
+              <div>
+                <label className="block text-sm font-semibold opacity-80 mb-2">Project Deadline</label>
+                <input
+                  type="date"
+                  value={formData.dueDate}
+                  onChange={(e) => setFormData({...formData, dueDate: e.target.value})}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:bg-white/10 transition-all"
+                />
+              </div>
               
               <div>
                 <label className="block text-sm font-semibold opacity-80 mb-3">Assign Team Members</label>
+                <div className="mb-3">
+                  <input 
+                    type="text" 
+                    placeholder="Search members..." 
+                    value={memberSearchTerm}
+                    onChange={(e) => setMemberSearchTerm(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                  />
+                </div>
                 <div className="grid grid-cols-2 gap-3 max-h-[200px] overflow-y-auto p-2 rounded-2xl bg-black/10 custom-scrollbar">
-                  {users.map(u => (
+                  {users
+                    .filter(u => u.name.toLowerCase().includes(memberSearchTerm.toLowerCase()) || u.email.toLowerCase().includes(memberSearchTerm.toLowerCase()))
+                    .map(u => (
                     <button
                       key={u._id}
                       type="button"
@@ -221,6 +267,14 @@ const Projects = () => {
           </div>
         </div>
       )}
+      {/* Confirm Delete Modal */}
+      <ConfirmModal 
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        onConfirm={confirmDelete}
+        title="Delete Project"
+        message="Are you sure you want to delete this project? All related tasks will also be permanently removed."
+      />
     </div>
   );
 };

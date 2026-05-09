@@ -19,11 +19,12 @@ const getProjects = asyncHandler(async (req, res) => {
 // @route   POST /api/projects
 // @access  Private/Admin
 const createProject = asyncHandler(async (req, res) => {
-  const { title, description, members } = req.body;
+  const { title, description, members, dueDate } = req.body;
 
   const project = new Project({
     title,
     description,
+    dueDate,
     members: members || [],
     createdBy: req.user._id
   });
@@ -55,13 +56,14 @@ const getProjectById = asyncHandler(async (req, res) => {
 // @route   PUT /api/projects/:id
 // @access  Private/Admin
 const updateProject = asyncHandler(async (req, res) => {
-  const { title, description, members } = req.body;
+  const { title, description, members, dueDate } = req.body;
 
   const project = await Project.findById(req.params.id);
 
   if (project) {
     project.title = title || project.title;
     project.description = description || project.description;
+    project.dueDate = dueDate || project.dueDate;
     project.members = members || project.members;
 
     const updatedProject = await project.save();

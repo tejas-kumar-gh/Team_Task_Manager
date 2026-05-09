@@ -1,5 +1,7 @@
 import asyncHandler from 'express-async-handler';
 import Task from '../models/Task.js';
+import Project from '../models/Project.js';
+import User from '../models/User.js';
 
 // @desc    Get all tasks
 // @route   GET /api/tasks
@@ -121,9 +123,9 @@ const getDashboardStats = asyncHandler(async (req, res) => {
 
   let totalProjects = 0;
   if (req.user.role === 'Admin') {
-    totalProjects = await import('../models/Project.js').then(m => m.default.countDocuments({}));
+    totalProjects = await Project.countDocuments({});
   } else {
-    totalProjects = await import('../models/Project.js').then(m => m.default.countDocuments({ members: req.user._id }));
+    totalProjects = await Project.countDocuments({ members: req.user._id });
   }
 
   let stats = {

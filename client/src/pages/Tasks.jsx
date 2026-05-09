@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
-import { Plus, Trash2, Calendar } from 'lucide-react';
+import { Plus, Trash2, Calendar, Search, Filter, X } from 'lucide-react';
 import { format } from 'date-fns';
+import ConfirmModal from '../components/ConfirmModal';
 
 const Tasks = () => {
   const [tasks, setTasks] = useState([]);
@@ -16,6 +17,17 @@ const Tasks = () => {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
   const [commentText, setCommentText] = useState('');
+  
+  // Confirm Modal State
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState(null);
+
+  // Filters
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('All');
+  const [filterPriority, setFilterPriority] = useState('All');
+  const [filterMember, setFilterMember] = useState('All');
+
   const [formData, setFormData] = useState({
     title: '', description: '', status: 'Todo', priority: 'Medium',
     dueDate: '', project: '', assignedTo: ''
@@ -103,14 +115,17 @@ const Tasks = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if(window.confirm('Are you sure you want to delete this task?')) {
-      try {
-        await api.delete(`/tasks/${id}`);
-        fetchData();
-      } catch (error) {
-        console.error('Failed to delete task', error);
-      }
+  const handleDelete = (id) => {
+    setTaskToDelete(id);
+    setIsConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await api.delete(`/tasks/${taskToDelete}`);
+      fetchData();
+    } catch (error) {
+      console.error('Failed to delete task', error);
     }
   };
 
@@ -132,20 +147,69 @@ const Tasks = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold">Tasks</h2>
-          <p className="text-sm opacity-60">Track progress and collaborate on project tasks.</p>
+      <div className="flex flex-col space-y-4">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold">Tasks</h2>
+            <p className="text-sm opacity-60">Track progress and collaborate on project tasks.</p>
+          </div>
+          {user?.role === 'Admin' && (
+            <button
+              onClick={() => handleOpenModal()}
+              className="flex items-center space-x-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-xl transition-colors shadow-lg shadow-primary/30"
+            >
+              <Plus size={20} />
+              <span>New Task</span>
+            </button>
+          )}
         </div>
-        {user?.role === 'Admin' && (
-          <button
-            onClick={() => handleOpenModal()}
-            className="flex items-center space-x-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-xl transition-colors shadow-lg shadow-primary/30"
+
+        {/* Filters bar */}
+        <div className="glass p-4 rounded-2xl flex flex-wrap gap-4 items-center border border-white/5">
+          <div className="flex-1 min-w-[200px]">
+             <input 
+               type="text" 
+               placeholder="Search tasks..." 
+               value={searchTerm}
+               onChange={(e) => setSearchTerm(e.target.value)}
+               className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-4 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+             />
+          </div>
+          
+          <select 
+            value={filterStatus} 
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="bg-white/5 border border-white/10 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
           >
-            <Plus size={20} />
-            <span>New Task</span>
-          </button>
-        )}
+            <option value="All" className="bg-[var(--background)]">All Status</option>
+            <option value="Todo" className="bg-[var(--background)]">Todo</option>
+            <option value="In Progress" className="bg-[var(--background)]">In Progress</option>
+            <option value="Completed" className="bg-[var(--background)]">Completed</option>
+            <option value="Overdue" className="bg-[var(--background)]">Overdue</option>
+          </select>
+
+          <select 
+            value={filterPriority} 
+            onChange={(e) => setFilterPriority(e.target.value)}
+            className="bg-white/5 border border-white/10 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
+          >
+            <option value="All" className="bg-[var(--background)]">All Priority</option>
+            <option value="High" className="bg-[var(--background)]">High</option>
+            <option value="Medium" className="bg-[var(--background)]">Medium</option>
+            <option value="Low" className="bg-[var(--background)]">Low</option>
+          </select>
+
+          {user?.role === 'Admin' && (
+            <select 
+              value={filterMember} 
+              onChange={(e) => setFilterMember(e.target.value)}
+              className="bg-white/5 border border-white/10 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
+            >
+              <option value="All" className="bg-[var(--background)]">All Members</option>
+              {users.map(u => <option key={u._id} value={u._id} className="bg-[var(--background)]">{u.name}</option>)}
+            </select>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -158,7 +222,20 @@ const Tasks = () => {
               </span>
             </h3>
             <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
-              {tasks.filter(t => t.status === status).map(task => (
+              {tasks
+                .filter(t => (status === 'All' || t.status === status))
+                .filter(t => {
+                  if (filterStatus === 'All') return true;
+                  if (filterStatus === 'Overdue') {
+                    return t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'Completed';
+                  }
+                  return t.status === filterStatus;
+                })
+                .filter(t => (filterPriority === 'All' || t.priority === filterPriority))
+                .filter(t => (filterMember === 'All' || t.assignedTo?._id === filterMember || t.assignedTo === filterMember))
+                .filter(t => t.title.toLowerCase().includes(searchTerm.toLowerCase()))
+                .filter(t => status !== 'All' ? t.status === status : true) // Ensure it stays in the correct column if not 'All' filter used on column
+                .map(task => (
                 <div 
                   key={task._id} 
                   onClick={() => openTaskDetails(task)}
@@ -184,6 +261,11 @@ const Tasks = () => {
                     <span className={`text-[10px] px-2 py-0.5 rounded-full border uppercase tracking-wider font-semibold ${getPriorityColor(task.priority)}`}>
                       {task.priority}
                     </span>
+                    {task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'Completed' && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full border border-red-500/20 bg-red-500/10 text-red-500 uppercase tracking-wider font-semibold animate-pulse">
+                        Overdue
+                      </span>
+                    )}
                     <span className="text-[10px] px-2 py-0.5 rounded-full border border-primary/20 bg-primary/5 text-primary uppercase tracking-wider font-semibold">
                       {task.project?.title || 'No Project'}
                     </span>
@@ -371,6 +453,14 @@ const Tasks = () => {
           </div>
         </div>
       )}
+      {/* Confirm Delete Modal */}
+      <ConfirmModal 
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        onConfirm={confirmDelete}
+        title="Delete Task"
+        message="Are you sure you want to delete this task? This action cannot be undone."
+      />
     </div>
   );
 };

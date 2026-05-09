@@ -8,6 +8,9 @@ const projectSchema = new mongoose.Schema({
   description: {
     type: String
   },
+  dueDate: {
+    type: Date
+  },
   members: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
