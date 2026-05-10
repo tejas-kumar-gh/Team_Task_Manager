@@ -8,9 +8,15 @@ import Task from '../models/Task.js';
 const getProjects = asyncHandler(async (req, res) => {
   let projects;
   if (req.user.role === 'Admin') {
-    projects = await Project.find({}).populate('members', 'name email').populate('createdBy', 'name');
+    projects = await Project.find({})
+      .populate('members', 'name email')
+      .populate('createdBy', 'name')
+      .sort({ createdAt: -1 });
   } else {
-    projects = await Project.find({ members: req.user._id }).populate('members', 'name email').populate('createdBy', 'name');
+    projects = await Project.find({ members: req.user._id })
+      .populate('members', 'name email')
+      .populate('createdBy', 'name')
+      .sort({ createdAt: -1 });
   }
   res.json(projects);
 });
@@ -21,16 +27,27 @@ const getProjects = asyncHandler(async (req, res) => {
 const createProject = asyncHandler(async (req, res) => {
   const { title, description, members, dueDate } = req.body;
 
+  if (!title || !title.trim()) {
+    res.status(400);
+    throw new Error('Project title is required');
+  }
+
   const project = new Project({
-    title,
-    description,
+    title: title.trim(),
+    description: description?.trim(),
     dueDate,
     members: members || [],
     createdBy: req.user._id
   });
 
   const createdProject = await project.save();
-  res.status(201).json(createdProject);
+  
+  // Return populated project
+  const populatedProject = await Project.findById(createdProject._id)
+    .populate('members', 'name email')
+    .populate('createdBy', 'name');
+  
+  res.status(201).json(populatedProject);
 });
 
 // @desc    Get a single project
@@ -61,13 +78,19 @@ const updateProject = asyncHandler(async (req, res) => {
   const project = await Project.findById(req.params.id);
 
   if (project) {
-    project.title = title || project.title;
-    project.description = description || project.description;
+    project.title = title?.trim() || project.title;
+    project.description = description !== undefined ? description.trim() : project.description;
     project.dueDate = dueDate || project.dueDate;
     project.members = members || project.members;
 
     const updatedProject = await project.save();
-    res.json(updatedProject);
+    
+    // Return populated project
+    const populatedProject = await Project.findById(updatedProject._id)
+      .populate('members', 'name email')
+      .populate('createdBy', 'name');
+    
+    res.json(populatedProject);
   } else {
     res.status(404);
     throw new Error('Project not found');

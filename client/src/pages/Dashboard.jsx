@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
-import { Layers, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
+import { Layers, CheckCircle2, Clock, AlertCircle, Users, TrendingUp } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Dashboard = () => {
@@ -9,7 +9,9 @@ const Dashboard = () => {
     totalTasks: 0,
     completedTasks: 0,
     pendingTasks: 0,
-    overdueTasks: 0
+    overdueTasks: 0,
+    completionRate: 0,
+    avgCompletionDays: 0,
   });
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
@@ -29,7 +31,11 @@ const Dashboard = () => {
   }, []);
 
   if (loading) {
-    return <div className="animate-pulse flex space-x-4">Loading dashboard...</div>;
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="loading-spinner"></div>
+      </div>
+    );
   }
 
   const statCards = [
@@ -41,15 +47,15 @@ const Dashboard = () => {
   ];
 
   if (user?.role === 'Admin') {
-    statCards.splice(1, 0, { title: 'Total Users', value: stats.totalUsers || 0, icon: <Layers size={24} className="text-orange-500" />, bg: 'bg-orange-500/10' });
+    statCards.splice(1, 0, { title: 'Total Users', value: stats.totalUsers || 0, icon: <Users size={24} className="text-orange-500" />, bg: 'bg-orange-500/10' });
   }
 
   // Calculate progress
   const progress = stats.totalTasks > 0 ? Math.round((stats.completedTasks / stats.totalTasks) * 100) : 0;
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+    <div className="space-y-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {statCards.map((card, index) => (
           <div key={index} className="glass p-5 rounded-2xl flex items-center space-x-3 hover:-translate-y-1 transition-transform duration-300">
             <div className={`p-3 rounded-xl ${card.bg}`}>
@@ -75,6 +81,7 @@ const Dashboard = () => {
                   stroke="currentColor" strokeWidth="8" fill="transparent"
                   strokeDasharray={`${progress * 2.51} 251`}
                   className="text-primary transition-all duration-1000 ease-out"
+                  strokeLinecap="round"
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -86,7 +93,7 @@ const Dashboard = () => {
         </div>
 
         <div className="glass p-6 rounded-2xl">
-          <h3 className="text-xl font-semibold mb-6">Welcome, {user?.name}!</h3>
+          <h3 className="text-xl font-semibold mb-6">Welcome, {user?.name || 'User'}!</h3>
           <p className="opacity-80 mb-4 leading-relaxed">
             {user?.role === 'Admin' 
               ? "As an Admin, you can create and manage projects, assign tasks to your team members, and monitor the overall progress of all activities."
@@ -99,21 +106,24 @@ const Dashboard = () => {
           
           {user?.role === 'Admin' && (
             <div className="space-y-4">
-              <h4 className="font-bold text-sm uppercase tracking-wider opacity-60">Team Productivity</h4>
+              <h4 className="font-bold text-sm uppercase tracking-wider opacity-60 flex items-center">
+                <TrendingUp size={14} className="mr-2" />
+                Team Productivity
+              </h4>
               <div className="space-y-3">
                 <div className="flex justify-between text-xs">
                   <span>Task Completion Rate</span>
-                  <span className="font-bold text-emerald-500">84%</span>
+                  <span className="font-bold text-emerald-500">{stats.completionRate || 0}%</span>
                 </div>
                 <div className="w-full bg-black/10 h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-emerald-500 h-full w-[84%] rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                  <div className="bg-emerald-500 h-full rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)] transition-all duration-700" style={{ width: `${stats.completionRate || 0}%` }}></div>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span>Average Time per Task</span>
-                  <span className="font-bold text-blue-500">2.4 Days</span>
+                  <span className="font-bold text-blue-500">{stats.avgCompletionDays || 0} Days</span>
                 </div>
                 <div className="w-full bg-black/10 h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-blue-500 h-full w-[60%] rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
+                  <div className="bg-blue-500 h-full rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)] transition-all duration-700" style={{ width: `${Math.min((stats.avgCompletionDays || 0) * 10, 100)}%` }}></div>
                 </div>
               </div>
             </div>

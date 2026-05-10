@@ -8,7 +8,12 @@ import generateToken from '../utils/generateToken.js';
 const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  const user = await User.findOne({ email });
+  if (!email || !password) {
+    res.status(400);
+    throw new Error('Please provide email and password');
+  }
+
+  const user = await User.findOne({ email: email.toLowerCase().trim() });
 
   if (user && (await user.matchPassword(password))) {
     generateToken(res, user._id);
@@ -30,7 +35,22 @@ const loginUser = asyncHandler(async (req, res) => {
 const registerUser = asyncHandler(async (req, res) => {
   const { name, email, password } = req.body;
 
-  const userExists = await User.findOne({ email });
+  if (!name || !name.trim()) {
+    res.status(400);
+    throw new Error('Name is required');
+  }
+
+  if (!email || !email.trim()) {
+    res.status(400);
+    throw new Error('Email is required');
+  }
+
+  if (!password || password.length < 6) {
+    res.status(400);
+    throw new Error('Password must be at least 6 characters');
+  }
+
+  const userExists = await User.findOne({ email: email.toLowerCase().trim() });
 
   if (userExists) {
     res.status(400);
@@ -38,8 +58,8 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 
   const user = await User.create({
-    name,
-    email,
+    name: name.trim(),
+    email: email.toLowerCase().trim(),
     password,
   });
 
@@ -85,6 +105,38 @@ const getUserProfile = asyncHandler(async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      createdAt: user.createdAt,
+    });
+  } else {
+    res.status(404);
+    throw new Error('User not found');
+  }
+});
+
+// @desc    Update user profile
+// @route   PUT /api/auth/profile
+// @access  Private
+const updateUserProfile = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+
+  if (user) {
+    user.name = req.body.name?.trim() || user.name;
+    user.email = req.body.email?.toLowerCase().trim() || user.email;
+
+    if (req.body.password) {
+      if (req.body.password.length < 6) {
+        res.status(400);
+        throw new Error('Password must be at least 6 characters');
+      }
+      user.password = req.body.password;
+    }
+
+    const updatedUser = await user.save();
+    res.json({
+      _id: updatedUser._id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      role: updatedUser.role,
     });
   } else {
     res.status(404);
@@ -96,8 +148,8 @@ const getUserProfile = asyncHandler(async (req, res) => {
 // @route   GET /api/auth/users
 // @access  Private
 const getUsers = asyncHandler(async (req, res) => {
-  const users = await User.find({}).select('-password');
+  const users = await User.find({}).select('-password').sort({ name: 1 });
   res.json(users);
 });
 
-export { loginUser, registerUser, logoutUser, getUserProfile, getUsers };
+export { loginUser, registerUser, logoutUser, getUserProfile, updateUserProfile, getUsers };

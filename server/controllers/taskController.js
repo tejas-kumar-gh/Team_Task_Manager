@@ -9,9 +9,17 @@ import User from '../models/User.js';
 const getTasks = asyncHandler(async (req, res) => {
   let tasks;
   if (req.user.role === 'Admin') {
-    tasks = await Task.find({}).populate('assignedTo', 'name').populate('project', 'title');
+    tasks = await Task.find({})
+      .populate('assignedTo', 'name email')
+      .populate('project', 'title')
+      .populate('comments.user', 'name')
+      .sort({ createdAt: -1 });
   } else {
-    tasks = await Task.find({ assignedTo: req.user._id }).populate('assignedTo', 'name').populate('project', 'title');
+    tasks = await Task.find({ assignedTo: req.user._id })
+      .populate('assignedTo', 'name email')
+      .populate('project', 'title')
+      .populate('comments.user', 'name')
+      .sort({ createdAt: -1 });
   }
   res.json(tasks);
 });
@@ -22,26 +30,45 @@ const getTasks = asyncHandler(async (req, res) => {
 const createTask = asyncHandler(async (req, res) => {
   const { title, description, status, priority, dueDate, assignedTo, project } = req.body;
 
+  if (!title || !title.trim()) {
+    res.status(400);
+    throw new Error('Task title is required');
+  }
+
+  if (!project) {
+    res.status(400);
+    throw new Error('Project is required');
+  }
+
   const task = new Task({
-    title,
-    description,
+    title: title.trim(),
+    description: description?.trim(),
     status,
     priority,
     dueDate,
-    assignedTo,
+    assignedTo: assignedTo || undefined,
     project,
     createdBy: req.user._id
   });
 
   const createdTask = await task.save();
-  res.status(201).json(createdTask);
+  
+  // Return populated task
+  const populatedTask = await Task.findById(createdTask._id)
+    .populate('assignedTo', 'name email')
+    .populate('project', 'title');
+  
+  res.status(201).json(populatedTask);
 });
 
 // @desc    Get a single task
 // @route   GET /api/tasks/:id
 // @access  Private
 const getTaskById = asyncHandler(async (req, res) => {
-  const task = await Task.findById(req.params.id).populate('assignedTo', 'name').populate('project', 'title');
+  const task = await Task.findById(req.params.id)
+    .populate('assignedTo', 'name email')
+    .populate('project', 'title')
+    .populate('comments.user', 'name email');
 
   if (task) {
     if (req.user.role !== 'Admin' && (!task.assignedTo || !task.assignedTo._id.equals(req.user._id))) {
@@ -70,8 +97,8 @@ const updateTask = asyncHandler(async (req, res) => {
     }
 
     if (req.user.role === 'Admin') {
-      task.title = title || task.title;
-      task.description = description || task.description;
+      task.title = title?.trim() || task.title;
+      task.description = description !== undefined ? description.trim() : task.description;
       task.priority = priority || task.priority;
       task.dueDate = dueDate || task.dueDate;
       task.assignedTo = assignedTo || task.assignedTo;
@@ -79,10 +106,19 @@ const updateTask = asyncHandler(async (req, res) => {
     }
     
     // Both Admin and Member can update status
-    task.status = status || task.status;
+    if (status) {
+      task.status = status;
+    }
 
     const updatedTask = await task.save();
-    res.json(updatedTask);
+    
+    // Return populated task
+    const populatedTask = await Task.findById(updatedTask._id)
+      .populate('assignedTo', 'name email')
+      .populate('project', 'title')
+      .populate('comments.user', 'name');
+    
+    res.json(populatedTask);
   } else {
     res.status(404);
     throw new Error('Task not found');
@@ -128,12 +164,29 @@ const getDashboardStats = asyncHandler(async (req, res) => {
     totalProjects = await Project.countDocuments({ members: req.user._id });
   }
 
+  // Calculate real completion rate
+  const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  // Calculate average completion time (days) for completed tasks
+  const completedTaskDocs = tasks.filter(t => t.status === 'Completed' && t.createdAt);
+  let avgCompletionDays = 0;
+  if (completedTaskDocs.length > 0) {
+    const totalDays = completedTaskDocs.reduce((sum, t) => {
+      const created = new Date(t.createdAt);
+      const updated = new Date(t.updatedAt);
+      return sum + (updated - created) / (1000 * 60 * 60 * 24);
+    }, 0);
+    avgCompletionDays = Math.round((totalDays / completedTaskDocs.length) * 10) / 10;
+  }
+
   let stats = {
     totalProjects,
     totalTasks,
     completedTasks,
     pendingTasks,
-    overdueTasks
+    overdueTasks,
+    completionRate,
+    avgCompletionDays,
   };
 
   if (req.user.role === 'Admin') {
@@ -148,17 +201,30 @@ const getDashboardStats = asyncHandler(async (req, res) => {
 // @access  Private
 const addComment = asyncHandler(async (req, res) => {
   const { text } = req.body;
+
+  if (!text || !text.trim()) {
+    res.status(400);
+    throw new Error('Comment text is required');
+  }
+
   const task = await Task.findById(req.params.id);
 
   if (task) {
     const comment = {
-      text,
+      text: text.trim(),
       user: req.user._id
     };
 
     task.comments.push(comment);
     await task.save();
-    res.status(201).json(task.comments[task.comments.length - 1]);
+
+    // Return the full task with populated comments
+    const populatedTask = await Task.findById(task._id)
+      .populate('assignedTo', 'name email')
+      .populate('project', 'title')
+      .populate('comments.user', 'name email');
+
+    res.status(201).json(populatedTask);
   } else {
     res.status(404);
     throw new Error('Task not found');

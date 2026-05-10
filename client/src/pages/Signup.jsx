@@ -2,22 +2,39 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock, User } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const Signup = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (password.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    setLoading(true);
     try {
       await register(name, email, password);
+      toast.success('Account created successfully!');
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to sign up');
+      toast.error(err.response?.data?.message || 'Failed to sign up');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -26,69 +43,96 @@ const Signup = () => {
       <div className="absolute top-0 left-0 -z-10 w-[500px] h-[500px] bg-purple-500/20 rounded-full blur-[100px] opacity-70"></div>
       <div className="absolute bottom-0 right-0 -z-10 w-[500px] h-[500px] bg-primary/20 rounded-full blur-[100px] opacity-70"></div>
       
-      <div className="glass p-10 rounded-3xl w-full max-w-md shadow-2xl z-10 border border-white/20">
+      <div className="glass p-10 rounded-3xl w-full max-w-md shadow-2xl z-10 border border-white/20 mx-4">
         <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold mb-2">Create Account</h2>
+          <h1 className="text-3xl font-bold mb-2">Create Account</h1>
           <p className="opacity-70">Join TeamSync today</p>
         </div>
-        
-        {error && (
-          <div className="bg-red-500/10 text-red-500 p-3 rounded-lg mb-6 text-sm text-center border border-red-500/20">
-            {error}
-          </div>
-        )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-1">
-            <label className="text-sm font-medium opacity-80 pl-1">Full Name</label>
+            <label htmlFor="signup-name" className="text-sm font-medium opacity-80 pl-1">Full Name</label>
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 opacity-50" size={20} />
               <input
+                id="signup-name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white/10 transition-all"
                 placeholder="John Doe"
                 required
+                disabled={loading}
               />
             </div>
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium opacity-80 pl-1">Email</label>
+            <label htmlFor="signup-email" className="text-sm font-medium opacity-80 pl-1">Email</label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 opacity-50" size={20} />
               <input
+                id="signup-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white/10 transition-all"
                 placeholder="you@example.com"
                 required
+                disabled={loading}
               />
             </div>
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium opacity-80 pl-1">Password</label>
+            <label htmlFor="signup-password" className="text-sm font-medium opacity-80 pl-1">Password</label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 opacity-50" size={20} />
               <input
+                id="signup-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white/10 transition-all"
-                placeholder="••••••••"
+                placeholder="Min 6 characters"
                 required
+                minLength={6}
+                disabled={loading}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label htmlFor="signup-confirm-password" className="text-sm font-medium opacity-80 pl-1">Confirm Password</label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 opacity-50" size={20} />
+              <input
+                id="signup-confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white/10 transition-all"
+                placeholder="Re-enter password"
+                required
+                minLength={6}
+                disabled={loading}
               />
             </div>
           </div>
 
           <button
             type="submit"
-            className="w-full bg-primary hover:bg-primary-dark text-white font-semibold py-3 rounded-xl shadow-lg shadow-primary/30 transition-all mt-2 active:scale-[0.98]"
+            disabled={loading}
+            className="w-full bg-primary hover:bg-primary-dark text-white font-semibold py-3 rounded-xl shadow-lg shadow-primary/30 transition-all mt-2 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
           >
-            Sign Up
+            {loading ? (
+              <>
+                <div className="loading-spinner loading-spinner-sm border-white/30 border-t-white"></div>
+                <span>Creating account...</span>
+              </>
+            ) : (
+              <span>Sign Up</span>
+            )}
           </button>
         </form>
 

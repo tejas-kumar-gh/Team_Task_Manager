@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
-import { Plus, Trash2, Calendar, Search, Filter, X } from 'lucide-react';
+import { Plus, Trash2, Calendar, Search, Edit2, MessageSquare, X } from 'lucide-react';
 import { format } from 'date-fns';
 import ConfirmModal from '../components/ConfirmModal';
+import toast from 'react-hot-toast';
 
 const Tasks = () => {
   const [tasks, setTasks] = useState([]);
@@ -17,6 +18,8 @@ const Tasks = () => {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
   const [commentText, setCommentText] = useState('');
+  const [commentLoading, setCommentLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   
   // Confirm Modal State
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -33,7 +36,7 @@ const Tasks = () => {
     dueDate: '', project: '', assignedTo: ''
   });
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [tasksRes, projectsRes] = await Promise.all([
         api.get('/tasks'),
@@ -51,11 +54,11 @@ const Tasks = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.role]);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (user) fetchData();
+  }, [user, fetchData]);
 
   const handleOpenModal = (task = null) => {
     if (task) {
@@ -78,40 +81,48 @@ const Tasks = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSaving(true);
     try {
       if (editingTask) {
         await api.put(`/tasks/${editingTask._id}`, formData);
+        toast.success('Task updated successfully');
       } else {
         await api.post('/tasks', formData);
+        toast.success('Task created successfully');
       }
       setIsModalOpen(false);
       fetchData();
     } catch (error) {
-      console.error('Failed to save task', error);
+      toast.error(error.response?.data?.message || 'Failed to save task');
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleAddComment = async (e) => {
     e.preventDefault();
     if (!commentText.trim()) return;
+    setCommentLoading(true);
     try {
-      await api.post(`/tasks/${selectedTask._id}/comments`, { text: commentText });
+      const { data } = await api.post(`/tasks/${selectedTask._id}/comments`, { text: commentText });
       setCommentText('');
-      // Refresh selected task to show new comment
-      const { data } = await api.get(`/tasks/${selectedTask._id}`);
       setSelectedTask(data);
       fetchData();
+      toast.success('Comment added');
     } catch (error) {
-      console.error('Failed to add comment', error);
+      toast.error(error.response?.data?.message || 'Failed to add comment');
+    } finally {
+      setCommentLoading(false);
     }
   };
 
   const handleStatusChange = async (taskId, newStatus) => {
     try {
       await api.put(`/tasks/${taskId}`, { status: newStatus });
+      toast.success(`Status changed to ${newStatus}`);
       fetchData();
     } catch (error) {
-      console.error('Failed to update status', error);
+      toast.error(error.response?.data?.message || 'Failed to update status');
     }
   };
 
@@ -123,14 +134,20 @@ const Tasks = () => {
   const confirmDelete = async () => {
     try {
       await api.delete(`/tasks/${taskToDelete}`);
+      toast.success('Task deleted');
       fetchData();
     } catch (error) {
-      console.error('Failed to delete task', error);
+      toast.error(error.response?.data?.message || 'Failed to delete task');
     }
   };
 
-  const openTaskDetails = (task) => {
-    setSelectedTask(task);
+  const openTaskDetails = async (task) => {
+    try {
+      const { data } = await api.get(`/tasks/${task._id}`);
+      setSelectedTask(data);
+    } catch {
+      setSelectedTask(task);
+    }
     setIsDetailModalOpen(true);
   };
 
@@ -143,10 +160,32 @@ const Tasks = () => {
     }
   };
 
-  if (loading) return <div className="animate-pulse">Loading tasks...</div>;
+  // Apply global filters
+  const getFilteredTasks = (columnStatus) => {
+    return (tasks || [])
+      .filter(t => t.status === columnStatus)
+      .filter(t => {
+        if (filterStatus === 'All') return true;
+        if (filterStatus === 'Overdue') {
+          return t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'Completed';
+        }
+        return t.status === filterStatus;
+      })
+      .filter(t => filterPriority === 'All' || t.priority === filterPriority)
+      .filter(t => filterMember === 'All' || t.assignedTo?._id === filterMember || t.assignedTo === filterMember)
+      .filter(t => t.title?.toLowerCase().includes(searchTerm.toLowerCase()));
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="loading-spinner"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-6">
       <div className="flex flex-col space-y-4">
         <div className="flex justify-between items-center">
           <div>
@@ -166,13 +205,14 @@ const Tasks = () => {
 
         {/* Filters bar */}
         <div className="glass p-4 rounded-2xl flex flex-wrap gap-4 items-center border border-white/5">
-          <div className="flex-1 min-w-[200px]">
+          <div className="flex-1 min-w-[200px] relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40" size={16} />
              <input 
                type="text" 
                placeholder="Search tasks..." 
                value={searchTerm}
                onChange={(e) => setSearchTerm(e.target.value)}
-               className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-4 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+               className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-9 pr-4 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
              />
           </div>
           
@@ -213,29 +253,18 @@ const Tasks = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {['Todo', 'In Progress', 'Completed'].map(status => (
+        {['Todo', 'In Progress', 'Completed'].map(status => {
+          const columnTasks = getFilteredTasks(status);
+          return (
           <div key={status} className="glass p-6 rounded-2xl flex flex-col h-[70vh] border border-white/5">
             <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-white/10 flex justify-between items-center">
               {status}
               <span className="text-xs py-1 px-2 rounded-full bg-black/10 dark:bg-white/10">
-                {(tasks || []).filter(t => t.status === status).length}
+                {columnTasks.length}
               </span>
             </h3>
             <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
-              {(tasks || [])
-                .filter(t => (status === 'All' || t.status === status))
-                .filter(t => {
-                  if (filterStatus === 'All') return true;
-                  if (filterStatus === 'Overdue') {
-                    return t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'Completed';
-                  }
-                  return t.status === filterStatus;
-                })
-                .filter(t => (filterPriority === 'All' || t.priority === filterPriority))
-                .filter(t => (filterMember === 'All' || t.assignedTo?._id === filterMember || t.assignedTo === filterMember))
-                .filter(t => t.title?.toLowerCase().includes(searchTerm.toLowerCase()))
-                .filter(t => status !== 'All' ? t.status === status : true)
-                .map(task => (
+              {columnTasks.map(task => (
                 <div 
                   key={task._id} 
                   onClick={() => openTaskDetails(task)}
@@ -246,12 +275,14 @@ const Tasks = () => {
                       <button 
                         onClick={(e) => { e.stopPropagation(); handleOpenModal(task); }}
                         className="text-primary p-1 rounded-md hover:bg-primary/10"
+                        title="Edit task"
                       >
-                        <Calendar size={14} />
+                        <Edit2 size={14} />
                       </button>
                       <button 
                         onClick={(e) => { e.stopPropagation(); handleDelete(task._id); }}
                         className="text-red-500 p-1 rounded-md hover:bg-red-500/10"
+                        title="Delete task"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -262,7 +293,7 @@ const Tasks = () => {
                       {task.priority}
                     </span>
                     {task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'Completed' && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full border border-red-500/20 bg-red-500/10 text-red-500 uppercase tracking-wider font-semibold animate-pulse">
+                      <span className="text-[10px] px-2 py-0.5 rounded-full border border-red-500/20 bg-red-500/10 text-red-500 uppercase tracking-wider font-semibold pulse-dot">
                         Overdue
                       </span>
                     )}
@@ -274,9 +305,17 @@ const Tasks = () => {
                   <p className="text-xs opacity-60 mb-4 line-clamp-2">{task.description}</p>
                   
                   <div className="flex items-center justify-between text-[10px] mt-auto">
-                    <div className="flex items-center space-x-1 opacity-50">
-                      <Calendar size={12} />
-                      <span>{task.dueDate ? format(new Date(task.dueDate), 'MMM dd') : 'No date'}</span>
+                    <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-1 opacity-50">
+                        <Calendar size={12} />
+                        <span>{task.dueDate ? format(new Date(task.dueDate), 'MMM dd') : 'No date'}</span>
+                      </div>
+                      {(task.comments || []).length > 0 && (
+                        <div className="flex items-center space-x-1 opacity-50">
+                          <MessageSquare size={12} />
+                          <span>{task.comments.length}</span>
+                        </div>
+                      )}
                     </div>
                     
                     <div className="flex items-center space-x-2">
@@ -297,14 +336,20 @@ const Tasks = () => {
                   </div>
                 </div>
               ))}
+              {columnTasks.length === 0 && (
+                <div className="text-center py-10 opacity-30">
+                  <p className="text-sm">No tasks</p>
+                </div>
+              )}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Task Creation/Edit Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
           <div className="glass p-8 rounded-3xl w-full max-w-lg bg-[var(--background)] max-h-[90vh] overflow-y-auto custom-scrollbar border border-white/10">
             <h3 className="text-2xl font-bold mb-6">{editingTask ? 'Edit Task' : 'Create New Task'}</h3>
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -356,8 +401,15 @@ const Tasks = () => {
               
               <div className="flex space-x-3 pt-6">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-4 rounded-2xl border border-white/10 hover:bg-white/5 font-medium transition-all">Cancel</button>
-                <button type="submit" className="flex-1 bg-primary text-white font-bold py-4 rounded-2xl shadow-lg shadow-primary/30 transition-all hover:scale-[1.02] active:scale-100">
-                  {editingTask ? 'Save Changes' : 'Create Task'}
+                <button type="submit" disabled={saving} className="flex-1 bg-primary text-white font-bold py-4 rounded-2xl shadow-lg shadow-primary/30 transition-all hover:scale-[1.02] active:scale-100 disabled:opacity-60 flex items-center justify-center space-x-2">
+                  {saving ? (
+                    <>
+                      <div className="loading-spinner loading-spinner-sm border-white/30 border-t-white"></div>
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>{editingTask ? 'Save Changes' : 'Create Task'}</span>
+                  )}
                 </button>
               </div>
             </form>
@@ -367,7 +419,7 @@ const Tasks = () => {
 
       {/* Task Detail Modal with Comments */}
       {isDetailModalOpen && selectedTask && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
           <div className="glass p-8 rounded-3xl w-full max-w-2xl bg-[var(--background)] max-h-[90vh] flex flex-col border border-white/10">
             <div className="flex justify-between items-start mb-6">
               <div>
@@ -376,12 +428,14 @@ const Tasks = () => {
                     {selectedTask.priority}
                   </span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold uppercase">
-                    {selectedTask.project?.title}
+                    {selectedTask.project?.title || 'No Project'}
                   </span>
                 </div>
                 <h3 className="text-2xl font-bold">{selectedTask.title}</h3>
               </div>
-              <button onClick={() => setIsDetailModalOpen(false)} className="text-2xl opacity-50 hover:opacity-100">&times;</button>
+              <button onClick={() => setIsDetailModalOpen(false)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
+                <X size={20} />
+              </button>
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-6 pr-4 custom-scrollbar">
@@ -410,24 +464,26 @@ const Tasks = () => {
               </div>
 
               <div className="space-y-4">
-                <h4 className="text-sm font-bold opacity-50 uppercase tracking-widest">Comments</h4>
+                <h4 className="text-sm font-bold opacity-50 uppercase tracking-widest">
+                  Comments ({(selectedTask.comments || []).length})
+                </h4>
                 <div className="space-y-4">
                   {(selectedTask.comments || []).map((comment, i) => (
-                    <div key={i} className="flex space-x-3">
+                    <div key={comment._id || i} className="flex space-x-3">
                       <div className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center text-xs font-bold shrink-0">
                          {comment.user?.name?.charAt(0) || 'U'}
                       </div>
                       <div className="flex-1 bg-white/5 rounded-2xl p-3">
                         <div className="flex justify-between items-center mb-1">
                            <span className="text-xs font-bold">{comment.user?.name || 'User'}</span>
-                           <span className="text-[10px] opacity-40">{format(new Date(comment.createdAt), 'MMM dd, HH:mm')}</span>
+                           <span className="text-[10px] opacity-40">{comment.createdAt ? format(new Date(comment.createdAt), 'MMM dd, HH:mm') : ''}</span>
                         </div>
                         <p className="text-xs opacity-80">{comment.text}</p>
                       </div>
                     </div>
                   ))}
                   {(selectedTask.comments || []).length === 0 && (
-                    <p className="text-xs opacity-40 text-center py-4 italic">No comments yet.</p>
+                    <p className="text-xs opacity-40 text-center py-4 italic">No comments yet. Be the first to comment!</p>
                   )}
                 </div>
               </div>
@@ -441,12 +497,18 @@ const Tasks = () => {
                    onChange={(e) => setCommentText(e.target.value)}
                    placeholder="Add a comment..."
                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-primary"
+                   disabled={commentLoading}
                  />
                  <button 
                    type="submit"
-                   className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-primary-dark transition-colors"
+                   disabled={commentLoading || !commentText.trim()}
+                   className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-primary-dark transition-colors disabled:opacity-40 flex items-center space-x-1"
                  >
-                   Post
+                   {commentLoading ? (
+                     <div className="loading-spinner loading-spinner-sm border-white/30 border-t-white"></div>
+                   ) : (
+                     <span>Post</span>
+                   )}
                  </button>
                </div>
             </form>

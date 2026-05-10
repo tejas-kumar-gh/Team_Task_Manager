@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { Plus, Edit2, Trash2, Layers, Search, X } from 'lucide-react';
 import { format } from 'date-fns';
 import ConfirmModal from '../components/ConfirmModal';
+import toast from 'react-hot-toast';
 
 const Projects = () => {
   const [projects, setProjects] = useState([]);
@@ -15,6 +16,7 @@ const Projects = () => {
   const [editingProject, setEditingProject] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [memberSearchTerm, setMemberSearchTerm] = useState('');
+  const [saving, setSaving] = useState(false);
   
   // Confirm Modal State
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -22,7 +24,7 @@ const Projects = () => {
 
   const [formData, setFormData] = useState({ title: '', description: '', members: [], dueDate: '' });
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [projectsRes, usersRes] = await Promise.all([
         api.get('/projects'),
@@ -35,11 +37,11 @@ const Projects = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.role]);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (user) fetchData();
+  }, [user, fetchData]);
 
   const handleOpenModal = (project = null) => {
     if (project) {
@@ -54,21 +56,27 @@ const Projects = () => {
       setEditingProject(null);
       setFormData({ title: '', description: '', members: [], dueDate: '' });
     }
+    setMemberSearchTerm('');
     setIsModalOpen(true);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSaving(true);
     try {
       if (editingProject) {
         await api.put(`/projects/${editingProject._id}`, formData);
+        toast.success('Project updated successfully');
       } else {
         await api.post('/projects', formData);
+        toast.success('Project created successfully');
       }
       setIsModalOpen(false);
       fetchData();
     } catch (error) {
-      console.error('Failed to save project', error);
+      toast.error(error.response?.data?.message || 'Failed to save project');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -80,9 +88,10 @@ const Projects = () => {
   const confirmDelete = async () => {
     try {
       await api.delete(`/projects/${projectToDelete}`);
+      toast.success('Project deleted');
       fetchData();
     } catch (error) {
-      console.error('Failed to delete project', error);
+      toast.error(error.response?.data?.message || 'Failed to delete project');
     }
   };
 
@@ -95,10 +104,20 @@ const Projects = () => {
     }));
   };
 
-  if (loading) return <div className="animate-pulse">Loading projects...</div>;
+  const filteredProjects = (projects || []).filter(p => 
+    p.title?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="loading-spinner"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold">Projects</h2>
@@ -106,18 +125,19 @@ const Projects = () => {
         </div>
         <div className="flex w-full md:w-auto space-x-3">
           <div className="relative flex-1 md:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40" size={16} />
             <input 
               type="text" 
               placeholder="Search projects..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-4 pr-10 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+              className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-9 pr-4 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
             />
           </div>
           {user?.role === 'Admin' && (
             <button
               onClick={() => handleOpenModal()}
-              className="flex items-center space-x-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-xl transition-colors shadow-lg shadow-primary/30"
+              className="flex items-center space-x-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-xl transition-colors shadow-lg shadow-primary/30 whitespace-nowrap"
             >
               <Plus size={20} />
               <span>New Project</span>
@@ -127,19 +147,21 @@ const Projects = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {(projects || []).filter(p => p.title?.toLowerCase().includes(searchTerm.toLowerCase())).map((project) => (
+        {filteredProjects.map((project) => (
           <div key={project._id} className="glass p-6 rounded-2xl group hover:-translate-y-1 transition-all duration-300 relative border border-white/5 hover:border-primary/30">
             {user?.role === 'Admin' && (
               <div className="absolute top-4 right-4 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button 
                   onClick={() => handleOpenModal(project)}
                   className="text-primary bg-primary/10 p-2 rounded-lg hover:bg-primary/20"
+                  title="Edit project"
                 >
                   <Edit2 size={16} />
                 </button>
                 <button 
                   onClick={() => handleDelete(project._id)}
                   className="text-red-500 bg-red-500/10 p-2 rounded-lg hover:bg-red-500/20"
+                  title="Delete project"
                 >
                   <Trash2 size={16} />
                 </button>
@@ -151,7 +173,7 @@ const Projects = () => {
             <div className="flex items-center justify-between mt-auto">
               <div className="flex -space-x-2 overflow-hidden">
                 {(project.members || []).slice(0, 4).map((member, i) => (
-                  <div key={i} className="inline-block h-8 w-8 rounded-full ring-2 ring-background bg-gradient-to-tr from-primary to-purple-500 flex items-center justify-center text-[10px] text-white font-bold" title={member.name || 'Member'}>
+                  <div key={i} className="inline-block h-8 w-8 rounded-full ring-2 ring-background bg-gradient-to-tr from-primary to-purple-500 flex items-center justify-center text-[10px] text-white font-bold" title={member?.name || 'Member'}>
                     {(member?.name || 'M').charAt(0).toUpperCase()}
                   </div>
                 ))}
@@ -170,11 +192,13 @@ const Projects = () => {
             </div>
           </div>
         ))}
-        {projects.length === 0 && (
+        {filteredProjects.length === 0 && (
           <div className="col-span-full text-center py-20 glass rounded-3xl border border-dashed border-white/10">
             <Layers size={48} className="mx-auto mb-4 opacity-20" />
-            <p className="opacity-60 text-lg">No projects found.</p>
-            {user?.role === 'Admin' && <p className="text-sm opacity-40">Click "New Project" to create your first workspace.</p>}
+            <p className="opacity-60 text-lg">
+              {searchTerm ? 'No projects match your search.' : 'No projects found.'}
+            </p>
+            {user?.role === 'Admin' && !searchTerm && <p className="text-sm opacity-40 mt-1">Click "New Project" to create your first workspace.</p>}
           </div>
         )}
       </div>
@@ -245,6 +269,9 @@ const Projects = () => {
                       <span className="text-sm font-medium truncate">{u.name}</span>
                     </button>
                   ))}
+                  {(users || []).length === 0 && (
+                    <p className="col-span-2 text-xs opacity-40 text-center py-4">No team members available</p>
+                  )}
                 </div>
               </div>
 
@@ -258,9 +285,17 @@ const Projects = () => {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-primary hover:bg-primary-dark text-white font-bold py-4 rounded-2xl shadow-lg shadow-primary/30 transition-all hover:-translate-y-0.5 active:translate-y-0"
+                  disabled={saving}
+                  className="flex-1 bg-primary hover:bg-primary-dark text-white font-bold py-4 rounded-2xl shadow-lg shadow-primary/30 transition-all hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60 flex items-center justify-center space-x-2"
                 >
-                  {editingProject ? 'Save Changes' : 'Create Project'}
+                  {saving ? (
+                    <>
+                      <div className="loading-spinner loading-spinner-sm border-white/30 border-t-white"></div>
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>{editingProject ? 'Save Changes' : 'Create Project'}</span>
+                  )}
                 </button>
               </div>
             </form>

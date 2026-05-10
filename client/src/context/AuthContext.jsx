@@ -24,11 +24,13 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password });
     setUser(data);
+    return data;
   };
 
   const register = async (name, email, password) => {
     const { data } = await api.post('/auth/register', { name, email, password });
     setUser(data);
+    return data;
   };
 
   const logout = async () => {
@@ -36,8 +38,14 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  const updateProfile = async (profileData) => {
+    const { data } = await api.put('/auth/profile', profileData);
+    setUser(data);
+    return data;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading }}>
+    <AuthContext.Provider value={{ user, setUser, login, register, logout, updateProfile, loading }}>
       {children}
     </AuthContext.Provider>
   );
