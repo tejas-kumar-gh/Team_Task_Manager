@@ -33,7 +33,7 @@ const Profile = () => {
       await updateProfile(payload);
       setEditing(false);
       setFormData(prev => ({ ...prev, password: '' }));
-      toast.success('Profile updated successfully..');
+      toast.success('Profile updated successfully');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to update profile');
     } finally {

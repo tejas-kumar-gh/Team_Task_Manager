@@ -10,8 +10,10 @@ const api = axios.create({
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // If 401, the session expired — redirect to login
-    if (error.response?.status === 401 && !error.config.url.includes('/auth/login')) {
+    // If 401 on a non-auth endpoint, the session expired — redirect to login
+    // Skip redirect for /auth/* endpoints (profile check, login, register, logout)
+    // because AuthContext + ProtectedRoute already handle unauthenticated state via React routing
+    if (error.response?.status === 401 && !error.config.url.includes('/auth/')) {
       window.location.href = '/login';
     }
     return Promise.reject(error);
