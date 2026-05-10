@@ -39,12 +39,12 @@ const Tasks = () => {
         api.get('/tasks'),
         api.get('/projects')
       ]);
-      setTasks(tasksRes.data);
-      setProjects(projectsRes.data);
+      setTasks(Array.isArray(tasksRes.data) ? tasksRes.data : tasksRes.data?.tasks || []);
+      setProjects(Array.isArray(projectsRes.data) ? projectsRes.data : projectsRes.data?.projects || []);
       
       if (user?.role === 'Admin') {
         const usersRes = await api.get('/auth/users');
-        setUsers(usersRes.data);
+        setUsers(Array.isArray(usersRes.data) ? usersRes.data : usersRes.data?.users || []);
       }
     } catch (error) {
       console.error('Failed to fetch data', error);

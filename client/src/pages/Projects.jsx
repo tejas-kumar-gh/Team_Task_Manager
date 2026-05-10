@@ -28,8 +28,8 @@ const Projects = () => {
         api.get('/projects'),
         user?.role === 'Admin' ? api.get('/auth/users') : Promise.resolve({ data: [] })
       ]);
-      setProjects(projectsRes.data);
-      setUsers(usersRes.data);
+      setProjects(Array.isArray(projectsRes.data) ? projectsRes.data : projectsRes.data?.projects || []);
+      setUsers(Array.isArray(usersRes.data) ? usersRes.data : usersRes.data?.users || []);
     } catch (error) {
       console.error('Failed to fetch projects', error);
     } finally {
