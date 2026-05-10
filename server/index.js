@@ -44,7 +44,6 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   })
 );
-
 // Body parser
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
