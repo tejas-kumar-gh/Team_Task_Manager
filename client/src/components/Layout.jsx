@@ -85,7 +85,7 @@ const Layout = () => {
               <p className="text-xs opacity-70">{user?.role}</p>
             </div>
             <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-purple-500 flex items-center justify-center text-white font-bold text-lg shadow-lg">
-              {user?.name.charAt(0).toUpperCase()}
+              {user?.name?.charAt(0).toUpperCase()}
             </div>
           </div>
         </header>
