@@ -28,8 +28,8 @@ const Projects = () => {
         api.get('/projects'),
         user?.role === 'Admin' ? api.get('/auth/users') : Promise.resolve({ data: [] })
       ]);
-      setProjects(Array.isArray(projectsRes.data) ? projectsRes.data : projectsRes.data?.projects || []);
-      setUsers(Array.isArray(usersRes.data) ? usersRes.data : usersRes.data?.users || []);
+      setProjects(Array.isArray(projectsRes.data) ? projectsRes.data : []);
+      setUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
     } catch (error) {
       console.error('Failed to fetch projects', error);
     } finally {
@@ -48,7 +48,7 @@ const Projects = () => {
         title: project.title,
         description: project.description || '',
         dueDate: project.dueDate ? format(new Date(project.dueDate), 'yyyy-MM-dd') : '',
-        members: project.members.map(m => typeof m === 'object' ? m._id : m)
+        members: (project.members || []).map(m => typeof m === 'object' ? m._id : m)
       });
     } else {
       setEditingProject(null);
@@ -127,7 +127,7 @@ const Projects = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {projects.filter(p => p.title.toLowerCase().includes(searchTerm.toLowerCase())).map((project) => (
+        {(projects || []).filter(p => p.title?.toLowerCase().includes(searchTerm.toLowerCase())).map((project) => (
           <div key={project._id} className="glass p-6 rounded-2xl group hover:-translate-y-1 transition-all duration-300 relative border border-white/5 hover:border-primary/30">
             {user?.role === 'Admin' && (
               <div className="absolute top-4 right-4 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -150,14 +150,14 @@ const Projects = () => {
             
             <div className="flex items-center justify-between mt-auto">
               <div className="flex -space-x-2 overflow-hidden">
-                {project.members.slice(0, 4).map((member, i) => (
+                {(project.members || []).slice(0, 4).map((member, i) => (
                   <div key={i} className="inline-block h-8 w-8 rounded-full ring-2 ring-background bg-gradient-to-tr from-primary to-purple-500 flex items-center justify-center text-[10px] text-white font-bold" title={member.name || 'Member'}>
-                    {(member.name || 'M').charAt(0).toUpperCase()}
+                    {(member?.name || 'M').charAt(0).toUpperCase()}
                   </div>
                 ))}
-                {project.members.length > 4 && (
+                {(project.members || []).length > 4 && (
                   <div className="flex items-center justify-center h-8 w-8 rounded-full ring-2 ring-background bg-white/10 text-[10px] font-bold">
-                    +{project.members.length - 4}
+                    +{(project.members || []).length - 4}
                   </div>
                 )}
               </div>
@@ -226,8 +226,8 @@ const Projects = () => {
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3 max-h-[200px] overflow-y-auto p-2 rounded-2xl bg-black/10 custom-scrollbar">
-                  {users
-                    .filter(u => u.name.toLowerCase().includes(memberSearchTerm.toLowerCase()) || u.email.toLowerCase().includes(memberSearchTerm.toLowerCase()))
+                  {(users || [])
+                    .filter(u => u.name?.toLowerCase().includes(memberSearchTerm.toLowerCase()) || u.email?.toLowerCase().includes(memberSearchTerm.toLowerCase()))
                     .map(u => (
                     <button
                       key={u._id}
@@ -240,7 +240,7 @@ const Projects = () => {
                       }`}
                     >
                       <div className="h-6 w-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] mr-2">
-                        {u.name.charAt(0).toUpperCase()}
+                        {(u.name || 'U').charAt(0).toUpperCase()}
                       </div>
                       <span className="text-sm font-medium truncate">{u.name}</span>
                     </button>

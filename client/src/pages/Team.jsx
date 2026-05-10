@@ -10,7 +10,7 @@ const Team = () => {
     const fetchUsers = async () => {
       try {
         const { data } = await api.get('/auth/users');
-        setUsers(data);
+        setUsers(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error('Failed to fetch team members', error);
       } finally {
@@ -32,7 +32,7 @@ const Team = () => {
         {users.map((user) => (
           <div key={user._id} className="glass p-6 rounded-2xl flex flex-col items-center text-center hover:-translate-y-1 transition-all duration-300">
             <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-primary to-purple-500 flex items-center justify-center text-white font-bold text-3xl shadow-lg mb-4">
-              {(user.name?.charAt(0) || '?').toUpperCase()}
+              {(user.name || 'U').charAt(0).toUpperCase()}
             </div>
             <h3 className="text-xl font-semibold mb-1">{user.name}</h3>
             <div className="flex items-center text-sm opacity-70 mb-4">

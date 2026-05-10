@@ -39,12 +39,12 @@ const Tasks = () => {
         api.get('/tasks'),
         api.get('/projects')
       ]);
-      setTasks(Array.isArray(tasksRes.data) ? tasksRes.data : tasksRes.data?.tasks || []);
-      setProjects(Array.isArray(projectsRes.data) ? projectsRes.data : projectsRes.data?.projects || []);
+      setTasks(Array.isArray(tasksRes.data) ? tasksRes.data : []);
+      setProjects(Array.isArray(projectsRes.data) ? projectsRes.data : []);
       
       if (user?.role === 'Admin') {
         const usersRes = await api.get('/auth/users');
-        setUsers(Array.isArray(usersRes.data) ? usersRes.data : usersRes.data?.users || []);
+        setUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
       }
     } catch (error) {
       console.error('Failed to fetch data', error);
@@ -206,7 +206,7 @@ const Tasks = () => {
               className="bg-white/5 border border-white/10 rounded-xl py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
             >
               <option value="All" className="bg-[var(--background)]">All Members</option>
-              {users.map(u => <option key={u._id} value={u._id} className="bg-[var(--background)]">{u.name}</option>)}
+              {(users || []).map(u => <option key={u._id} value={u._id} className="bg-[var(--background)]">{u.name}</option>)}
             </select>
           )}
         </div>
@@ -218,11 +218,11 @@ const Tasks = () => {
             <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-white/10 flex justify-between items-center">
               {status}
               <span className="text-xs py-1 px-2 rounded-full bg-black/10 dark:bg-white/10">
-                {tasks.filter(t => t.status === status).length}
+                {(tasks || []).filter(t => t.status === status).length}
               </span>
             </h3>
             <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
-              {tasks
+              {(tasks || [])
                 .filter(t => (status === 'All' || t.status === status))
                 .filter(t => {
                   if (filterStatus === 'All') return true;
@@ -233,8 +233,8 @@ const Tasks = () => {
                 })
                 .filter(t => (filterPriority === 'All' || t.priority === filterPriority))
                 .filter(t => (filterMember === 'All' || t.assignedTo?._id === filterMember || t.assignedTo === filterMember))
-                .filter(t => t.title.toLowerCase().includes(searchTerm.toLowerCase()))
-                .filter(t => status !== 'All' ? t.status === status : true) // Ensure it stays in the correct column if not 'All' filter used on column
+                .filter(t => t.title?.toLowerCase().includes(searchTerm.toLowerCase()))
+                .filter(t => status !== 'All' ? t.status === status : true)
                 .map(task => (
                 <div 
                   key={task._id} 
@@ -330,14 +330,14 @@ const Tasks = () => {
                   <label className="block text-sm font-semibold opacity-70 mb-1.5">Project</label>
                   <select required value={formData.project} onChange={(e) => setFormData({...formData, project: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3 focus:outline-none focus:border-primary">
                     <option value="">Select Project</option>
-                    {projects.map(p => <option key={p._id} value={p._id} className="bg-[var(--background)]">{p.title}</option>)}
+                    {(projects || []).map(p => <option key={p._id} value={p._id} className="bg-[var(--background)]">{p.title}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold opacity-70 mb-1.5">Assign To</label>
                   <select value={formData.assignedTo} onChange={(e) => setFormData({...formData, assignedTo: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3 focus:outline-none focus:border-primary">
                     <option value="">Select User</option>
-                    {users.map(u => <option key={u._id} value={u._id} className="bg-[var(--background)]">{u.name}</option>)}
+                    {(users || []).map(u => <option key={u._id} value={u._id} className="bg-[var(--background)]">{u.name}</option>)}
                   </select>
                 </div>
                 <div>

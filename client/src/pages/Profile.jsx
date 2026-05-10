@@ -17,7 +17,7 @@ const Profile = () => {
         
         <div className="flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-8">
           <div className="w-32 h-32 rounded-full bg-gradient-to-tr from-primary to-purple-500 flex items-center justify-center text-white font-bold text-5xl shadow-2xl ring-4 ring-[var(--background)]">
-            {(user.name?.charAt(0) || '?').toUpperCase()}
+            {(user.name || 'U').charAt(0).toUpperCase()}
           </div>
           
           <div className="flex-1 space-y-6 w-full">
